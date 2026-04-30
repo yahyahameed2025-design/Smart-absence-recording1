@@ -2442,16 +2442,32 @@
                 }
                 return;
             }
-            // فحص إذا كان المعلم مسجل سابقاً بهذا الإيميل والباسورد
+            // فحص إذا كان المعلم مسجل سابقاً بهذا الإيميل
             let allTeachers = JSON.parse(localStorage.getItem("allTeachers") || "{}");
-            let key = loggedInEmail + "|" + loggedInPassword;
-            if (allTeachers[key]) {
-                const savedInfo = allTeachers[key];
-                loggedInTeacherName = savedInfo.name;
-                loggedInTeacherSubject = savedInfo.subject;
+            let foundTeacher = null;
+            let oldKey = null;
+            for (let k in allTeachers) {
+                if (allTeachers[k].email === loggedInEmail) {
+                    foundTeacher = allTeachers[k];
+                    oldKey = k;
+                    break;
+                }
+            }
+
+            if (foundTeacher) {
+                // تحديث كلمة المرور في حال تغيرت
+                foundTeacher.password = loggedInPassword;
+                if (oldKey !== loggedInEmail + "|" + loggedInPassword) {
+                    delete allTeachers[oldKey];
+                    allTeachers[loggedInEmail + "|" + loggedInPassword] = foundTeacher;
+                    localStorage.setItem("allTeachers", JSON.stringify(allTeachers));
+                }
+
+                loggedInTeacherName = foundTeacher.name;
+                loggedInTeacherSubject = foundTeacher.subject;
                 
                 // تحديث المعلم الحالي
-                localStorage.setItem("teacherInfo", JSON.stringify(savedInfo));
+                localStorage.setItem("teacherInfo", JSON.stringify(foundTeacher));
 
                 document.getElementById("login").style.display = "none";
                 document.getElementById("returningTeacherWelcome").style.display = "block";
