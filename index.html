@@ -1589,16 +1589,10 @@
                 style="width:100%; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-top:5px; background-color: #f1f5f9; color: #64748b; margin-bottom: 10px; text-align: left;"
                 dir="ltr">
 
-            <label>سبب تسجيل الخروج:</label>
-            <textarea id="logoutReason" rows="3" placeholder="اكتب هنا سبب طلب تسجيل الخروج..."
-                style="width:100%; padding:10px; border-radius:8px; border:1px solid #e2e8f0; margin-top:5px; font-family: inherit; margin-bottom: 15px; resize: none;"></textarea>
-
             <div class="btn-wrapper" style="margin-top: 10px;">
-                <button class="submit" id="sendLogoutReasonBtn" data-text="إرسال">إرسال</button>
+                <button class="submit" id="sendLogoutReasonBtn" data-text="خروج">خروج</button>
             </div>
 
-            <div class="btn-normal" style="background:var(--danger); margin-top: 15px;" onclick="openLogoutAuthModal()">
-                إدخال كلمة المرور</div>
             <div class="btn-normal" onclick="cancelLogout()" style="margin-top: 10px;">إلغاء</div>
         </div>
 
@@ -1698,20 +1692,7 @@
         </div>
     </div>
 
-    <!-- نافذة الموافقة على الخروج المخفية -->
-    <div id="logoutAuthOverlay" class="overlay">
-        <div class="modal-card">
-            <h3>🔑 إذن الخروج</h3>
-            <p>الرجاء إدخال كلمة مرور تسجيل الخروج</p>
-            <div class="code-inputs" dir="ltr" id="logoutAuthCodeInputs">
-                <input type="password" maxlength="1" inputmode="numeric"><input type="password" maxlength="1"
-                    inputmode="numeric"><input type="password" maxlength="1" inputmode="numeric"><input type="password"
-                    maxlength="1" inputmode="numeric">
-            </div>
-            <div onclick="document.getElementById('logoutAuthOverlay').style.display='none'"
-                style="margin-top:15px; cursor:pointer; color:#94a3b8;">إلغاء</div>
-        </div>
-    </div>
+    <!-- نافذة الموافقة على الخروج المخفية تم إزالتها -->
 
     <!-- نافذة سجل المعلم والتعديل -->
     <div id="teacherAbsenceOverlay" class="overlay">
@@ -2461,6 +2442,47 @@
                 }
                 return;
             }
+            // فحص إذا كان المعلم مسجل سابقاً بهذا الإيميل والباسورد
+            let allTeachers = JSON.parse(localStorage.getItem("allTeachers") || "{}");
+            let key = loggedInEmail + "|" + loggedInPassword;
+            if (allTeachers[key]) {
+                const savedInfo = allTeachers[key];
+                loggedInTeacherName = savedInfo.name;
+                loggedInTeacherSubject = savedInfo.subject;
+                
+                // تحديث المعلم الحالي
+                localStorage.setItem("teacherInfo", JSON.stringify(savedInfo));
+
+                document.getElementById("login").style.display = "none";
+                document.getElementById("returningTeacherWelcome").style.display = "block";
+                checkCompleteDataStatus();
+                document.getElementById("returningWelcomeMsg").textContent = "مرحباً أ/ " + loggedInTeacherName;
+                
+                if (document.getElementById("welcomeMsg")) {
+                    document.getElementById("welcomeMsg").textContent = "إعدادات الحصة";
+                }
+
+                if(document.getElementById("subjectLabel")) document.getElementById("subjectLabel").style.display = "none";
+                if(document.getElementById("dropdown1")) {
+                    document.getElementById("dropdown1").style.display = "none";
+                    
+                    let dropdown1 = document.getElementById("dropdown1");
+                    let exists = Array.from(dropdown1.options).some(opt => opt.value === loggedInTeacherSubject);
+                    if (!exists) {
+                        let newOpt = document.createElement("option");
+                        newOpt.value = loggedInTeacherSubject;
+                        newOpt.textContent = loggedInTeacherSubject;
+                        dropdown1.appendChild(newOpt);
+                    }
+                    dropdown1.value = loggedInTeacherSubject;
+                }
+                
+                // تحديث الدردشة إن وجدت
+                if (typeof listenToMessages === 'function') {
+                    listenToMessages();
+                }
+                return;
+            }
 
             // إخفاء شاشة تسجيل الدخول والانتقال لشاشة إكمال بيانات المعلم
             document.getElementById("login").style.display = "none";
@@ -2487,7 +2509,6 @@
             document.getElementById("logoutSubject").value = loggedInTeacherSubject;
             document.getElementById("logoutEmail").value = loggedInEmail || "غير متوفر";
             document.getElementById("logoutPassword").value = loggedInPassword || "غير متوفر";
-            document.getElementById("logoutReason").value = "";
         }
 
         function cancelLogout() {
@@ -2496,9 +2517,6 @@
         }
 
         document.getElementById("sendLogoutReasonBtn").onclick = () => {
-            const reason = document.getElementById("logoutReason").value;
-            if (!reason) return alert("الرجاء كتابة السبب للتسجيل الخروج.");
-
             document.getElementById("loader").style.display = "flex";
             const dateObj = new Date();
             const dateStr = dateObj.toLocaleDateString("ar-EG");
@@ -2515,7 +2533,7 @@
                 "date": dateStr,
                 "time": timeStr,
                 "class": "تسجيل خروج",
-                "reason": reason,
+                "reason": "تسجيل خروج مباشر",
                 "type": "TeacherLogout"
             }];
 
@@ -2528,23 +2546,14 @@
                 }
 
                 setTimeout(() => {
-                    document.getElementById("loader").style.display = "none";
-                    alert("طلبك جاري التنفيذ");
-                    document.getElementById("sendLogoutReasonBtn").disabled = true;
-                    document.getElementById("sendLogoutReasonBtn").style.opacity = "0.5";
-                    document.getElementById("logoutReason").disabled = true;
-                }, 1500);
+                    localStorage.removeItem("teacherInfo");
+                    localStorage.removeItem("userDeviceType");
+                    location.reload();
+                }, 500);
             } catch (e) {
                 document.getElementById("loader").style.display = "none";
                 alert("خطأ في الاتصال");
             }
-        }
-
-        function openLogoutAuthModal() {
-            document.getElementById("logoutAuthOverlay").style.display = "flex";
-            const inputs = document.querySelectorAll("#logoutAuthCodeInputs input");
-            inputs.forEach(i => i.value = "");
-            inputs[0].focus();
         }
 
         function toggleMenu() {
@@ -2732,19 +2741,7 @@
             }
         });
 
-        setupCodeNavigation("logoutAuthCodeInputs", (code) => {
-            if (code === "1000") {
-                document.getElementById("logoutAuthOverlay").style.display = "none";
-                localStorage.removeItem("teacherInfo");
-                localStorage.removeItem("userDeviceType");
-                location.reload();
-            } else {
-                alert("كلمة المرور غير صحيحة");
-                const inputs = document.querySelectorAll("#logoutAuthCodeInputs input");
-                inputs.forEach(i => i.value = "");
-                inputs[0].focus();
-            }
-        });
+
 
         setupCodeNavigation("resetCodeInputs");
         setupCodeNavigation("unlockCodeInputs");
@@ -2918,6 +2915,11 @@
                 // حفظ البيانات في المتصفح ليتم تذكرها في المرات القادمة
                 localStorage.setItem("teacherInfo", JSON.stringify({ name: name, subject: subject, email: loggedInEmail, password: loggedInPassword }));
 
+                // حفظ في السجل الشامل للمعلمين المسجلين
+                let allTeachers = JSON.parse(localStorage.getItem("allTeachers") || "{}");
+                allTeachers[loggedInEmail + "|" + loggedInPassword] = { name: name, subject: subject, email: loggedInEmail, password: loggedInPassword };
+                localStorage.setItem("allTeachers", JSON.stringify(allTeachers));
+
                 // حفظ الاسم في المتغير العالمي واستكمال العملية
                 loggedInTeacherName = name;
                 loggedInTeacherSubject = subject;
@@ -2939,6 +2941,11 @@
 
                 // نحفظها محلياً حتى لو فشل الاتصال بالإنترنت
                 localStorage.setItem("teacherInfo", JSON.stringify({ name: name, subject: subject, email: loggedInEmail, password: loggedInPassword }));
+                
+                let allTeachers = JSON.parse(localStorage.getItem("allTeachers") || "{}");
+                allTeachers[loggedInEmail + "|" + loggedInPassword] = { name: name, subject: subject, email: loggedInEmail, password: loggedInPassword };
+                localStorage.setItem("allTeachers", JSON.stringify(allTeachers));
+
                 loggedInTeacherName = name;
                 loggedInTeacherSubject = subject;
 
